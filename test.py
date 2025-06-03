@@ -1,31 +1,43 @@
-import pyautogui
 import time
-import webbrowser
-import pyperclip
+import requests
+import os
+from bs4 import BeautifulSoup
+from dotenv import load_dotenv
 
-# 1. Tarayıcıyı aç ve siteye git
-webbrowser.open("https://www.tesla.com/tr_tr")
-time.sleep(5)  # Sayfanın yüklenmesini bekle
+load_dotenv()
 
-# 2. "Envanteri Keşfedin" butonunun olduğu konuma git
-# Bu kısımdaki koordinatları senin ekranına göre ayarlaman gerekir
-pyautogui.moveTo(555, 850, duration=1)  # örnek koordinat
-pyautogui.click()
+target_models = ["Arkadan İtiş", 'arkadan itiş', 'Arkadan Itiş','Arkadan Çekiş', 'Arkadan çekiş', 'arkadan çekiş']
 
+API_TOKEN = os.getenv('TELEGRAM_API_TOKEN')
+CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
-time.sleep(6)
+def send_telegram_message(message):
+    url = f"https://api.telegram.org/bot{API_TOKEN}/sendMessage"
+    params = {
+        'chat_id': CHAT_ID,
+        'text': message
+    }
+    response = requests.get(url, params=params)
+    return response.json()
 
-# 3. Sayfanın tümünü seç ve kopyala (Command+A, Command+C)
-pyautogui.hotkey('command', 'a')
-time.sleep(1)
-pyautogui.hotkey('command', 'c')
-time.sleep(1)
-pyautogui.hotkey('command','w')
+while True:
+    print("Sayfa kontrol ediliyor...")
 
-page_text = pyperclip.paste()
+    try:
+        response = requests.get("https://www.tesla.com/tr_tr", timeout=20)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        page_text = soup.get_text()
 
-# 5. İçerikte Model Y var mı kontrol et
-if "Model Y" in page_text:
-    print("✅ Aranan araç mevcut.")
-else:
-    print("❌ Henüz stok gelmedi.")
+        found_models = [model for model in target_models if model in page_text]
+
+        if found_models:
+            for model in found_models:
+                send_telegram_message(f"{model} modeli mevcut!")
+        else:
+            print("Stok yok")
+
+    except Exception as e:
+        print("Hata oluştu:", e)
+
+    print("Yarım saat sonra tekrar kontrol edilecek...\n")
+    time.sleep(1800)  # 30 dakika
